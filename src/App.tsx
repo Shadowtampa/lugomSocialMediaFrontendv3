@@ -6,6 +6,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { Products } from '@/pages/resources/Products';
 import { Promotions } from '@/pages/resources/Promotions';
 import { MainLayout } from '@/components/layouts/MainLayout';
+import { Toaster } from "@/components/ui/sonner";
 
 export function App() {
   return (
@@ -25,6 +26,7 @@ export function App() {
 
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        <Toaster />
       </AuthProvider>
     </BrowserRouter>
   );

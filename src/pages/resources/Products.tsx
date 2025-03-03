@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { productService, Product } from '@/services/product';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, Pencil, Trash2, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ProductDialogs } from '@/components/dialogs/ProductDialogs';
+import { CreateProductDialog } from '@/components/dialogs/CreateProductDialog';
 
 export function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -24,6 +24,15 @@ export function Products() {
     }
   };
 
+  const handleDelete = async (id: number) => {
+    try {
+      await productService.delete(id);
+      setProducts(products.filter(product => product.id !== id));
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error);
+    }
+  };
+
   if (loading) {
     return <div>Carregando...</div>;
   }
@@ -32,10 +41,7 @@ export function Products() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Produtos</h2>
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Produto
-        </Button>
+        <CreateProductDialog onSuccess={loadProducts} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -77,18 +83,11 @@ export function Products() {
             </CardContent>
             <CardFooter className="flex-none pt-0">
               <div className="flex justify-between gap-2 w-full">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Pencil className="w-4 h-4 mr-2 text-blue-500" />
-                  Editar
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Trash2 className="w-4 h-4 mr-2 text-red-500" />
-                  Excluir
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Megaphone className="w-4 h-4 mr-2 text-purple-500" />
-                  Anunciar
-                </Button>
+                <ProductDialogs
+                  product={product}
+                  onDelete={handleDelete}
+                  onUpdate={loadProducts}
+                />
               </div>
             </CardFooter>
           </Card>
