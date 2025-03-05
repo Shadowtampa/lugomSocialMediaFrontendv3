@@ -1,14 +1,22 @@
 import api from '@/lib/axios';
 
+interface PromotionConfig {
+  discount_amount?: number;
+  min_purchase_amount?: number;
+  discount_percentage?: number;
+  product_id?: number;
+  x_product_id?: number;
+}
+
 export interface Promotion {
   id: number;
   name: string;
-  description: string | null;
-  type: 'fixed_discount' | 'percentage_discount' | 'buy_x_get_y';
-  value: number;
+  description: string;
   start_date: string;
-  end_date: string | null;
-  is_active: boolean;
+  end_date: string;
+  user_id: number;
+  config: string;
+  promotion_type_id: number; // 2: fixed, 3: percentage, 4: buy_x_get_y
   created_at: string;
   updated_at: string;
 }
@@ -16,11 +24,10 @@ export interface Promotion {
 export interface CreatePromotionData {
   name: string;
   description?: string;
-  type: 'fixed_discount' | 'percentage_discount' | 'buy_x_get_y';
-  value: number;
   start_date: string;
   end_date?: string;
-  is_active: boolean;
+  config: PromotionConfig;
+  promotion_type_id: number;
 }
 
 export interface UpdatePromotionData extends Partial<CreatePromotionData> {}
