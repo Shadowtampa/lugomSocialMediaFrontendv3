@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useReducer, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,6 +6,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Promotion } from '@/services/promotion';
 import { productService } from '@/services/product';
+import { useQuery } from '@tanstack/react-query';
+
+interface Product {
+  id: number;
+  name: string;
+}
 
 interface PromotionFormProps {
   initialData?: Promotion;
@@ -13,78 +19,106 @@ interface PromotionFormProps {
   submitLabel?: string;
 }
 
+// Estado inicial
+const initialState = {
+  name: '',
+  description: '',
+  startDate: '',
+  endDate: '',
+  promotionType: '',
+  discountAmount: '',
+  discountPercentage: '',
+  productId: '',
+  xProductId: '',
+  xProductAmount: '',
+  yProductId: '',
+  yProductAmount: '',
+};
+
+// Reducer para gerenciar o estado
+const reducer = (state, action) => {
+  return { ...state, [action.name]: action.value };
+};
+
 export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }: PromotionFormProps) {
-  const [name, setName] = useState(initialData?.name || '');
-  const [description, setDescription] = useState(initialData?.description || '');
-  const [startDate, setStartDate] = useState(initialData?.start_date ? new Date(initialData.start_date).toISOString().slice(0, 10) : '');
-  const [endDate, setEndDate] = useState(initialData?.end_date ? new Date(initialData.end_date).toISOString().slice(0, 10) : '');
-  const [promotionType, setPromotionType] = useState(initialData?.promotion_type_id?.toString() || '');
-  const [discountAmount, setDiscountAmount] = useState('');
-  const [discountPercentage, setDiscountPercentage] = useState('');
-  const [productId, setProductId] = useState('');
-  const [xProductId, setXProductId] = useState('');
-  const [xProductAmount, setXProductAmount] = useState('');
-  const [yProductId, setYProductId] = useState('');
-  const [yProductAmount, setYProductAmount] = useState('');
-  
-  const [products, setProducts] = useState([]);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
+  // Buscar produtos usando TanStack Query
+  const { data: products = [], isLoading, error } = useQuery({
+    queryKey: ['products'],
+    queryFn: productService.list,
+  });
+
+  // Inicializar estado com os dados iniciais
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const productList = await productService.list();
-        setProducts(productList);
-      } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
+    if (initialData) {
+      dispatch({ name: 'name', value: initialData.name || '' });
+      dispatch({ name: 'description', value: initialData.description || '' });
+      dispatch({
+        name: 'startDate',
+        value: initialData.start_date
+          ? new Date(initialData.start_date).toISOString().slice(0, 10)
+          : '',
+      });
+      dispatch({
+        name: 'endDate',
+        value: initialData.end_date
+          ? new Date(initialData.end_date).toISOString().slice(0, 10)
+          : '',
+      });
+      dispatch({
+        name: 'promotionType',
+        value: initialData.promotion_type_id?.toString() || '',
+      });
+
+      if (initialData.config) {
+        const config = JSON.parse(initialData.config);
+        Object.entries(config).forEach(([key, value]) =>
+          dispatch({ name: key, value: value?.toString() || '' })
+        );
       }
-    };
-
-    fetchProducts();
-  }, []);
-
-  useEffect(() => {
-    if (initialData?.config) {
-      const config = JSON.parse(initialData.config);
-      console.log('Configuração inicial:', config);
-
-      setDiscountAmount(config.discount_amount?.toString() || '');
-      setDiscountPercentage(config.discount_percentage?.toString() || '');
-      setProductId(config.product_id?.toString() || '');
-      setXProductId(config.x_product_id?.toString() || '');
-      setXProductAmount(config.x_product_amount?.toString() || '');
-      setYProductId(config.y_product_id?.toString() || '');
-      setYProductAmount(config.y_product_amount?.toString() || '');
     }
   }, [initialData]);
 
+  // Monitoramento do productId
   useEffect(() => {
-    console.log(productId)
-  }, [productId])
-  
+    console.log(state.productId);
+  }, [state.productId]);
+
+  const handleProductChange = (value: string, setProduct: React.Dispatch<React.SetStateAction<string>>) => {
+    console.log('Selected value:', value);
+    const numericValue = parseInt(value, 10);
+    if (!isNaN(numericValue)) {
+      setProduct(numericValue.toString());
+    } else {
+      console.warn('O valor selecionado não é um número válido:', value);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const formData = new FormData();
-    formData.append('name', name);
-    formData.append('description', description);
-    formData.append('start_date', startDate);
-    if (endDate) formData.append('end_date', endDate);
-    formData.append('promotion_type_id', promotionType);
+    formData.append('name', state.name);
+    formData.append('description', state.description);
+    formData.append('start_date', state.startDate);
+    if (state.endDate) formData.append('end_date', state.endDate);
+    formData.append('promotion_type_id', state.promotionType);
 
     let config = {};
-    switch (promotionType) {
+    switch (state.promotionType) {
       case '2': // fixed_discount
-        config = { discount_amount: parseFloat(discountAmount), product_id: parseInt(productId) };
+        config = { discount_amount: parseFloat(state.discountAmount), product_id: parseInt(state.productId) };
         break;
       case '3': // percentage_discount
-        config = { discount_percentage: parseFloat(discountPercentage), product_id: parseInt(productId) };
+        config = { discount_percentage: parseFloat(state.discountPercentage), product_id: parseInt(state.productId) };
         break;
       case '4': // buy_x_get_y
-        config = { 
-          x_product_id: parseInt(xProductId),
-          x_product_amount: parseInt(xProductAmount),
-          y_product_id: parseInt(yProductId),
-          y_product_amount: parseInt(yProductAmount),
+        config = {
+          x_product_id: parseInt(state.xProductId),
+          x_product_amount: parseInt(state.xProductAmount),
+          y_product_id: parseInt(state.yProductId),
+          y_product_amount: parseInt(state.yProductAmount),
         };
         break;
     }
@@ -103,8 +137,8 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
         <Label htmlFor="name">Nome</Label>
         <Input
           id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={state.name}
+          onChange={(e) => dispatch({ name: 'name', value: e.target.value })}
           required
         />
       </div>
@@ -113,8 +147,8 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
         <Label htmlFor="description">Descrição</Label>
         <Textarea
           id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          value={state.description}
+          onChange={(e) => dispatch({ name: 'description', value: e.target.value })}
         />
       </div>
 
@@ -124,8 +158,8 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
           <Input
             id="startDate"
             type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            value={state.startDate}
+            onChange={(e) => dispatch({ name: 'startDate', value: e.target.value })}
             required
           />
         </div>
@@ -135,15 +169,15 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
           <Input
             id="endDate"
             type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            value={state.endDate}
+            onChange={(e) => dispatch({ name: 'endDate', value: e.target.value })}
           />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="promotionType">Tipo de Promoção</Label>
-        <Select value={promotionType} onValueChange={setPromotionType}>
+        <Select value={state.promotionType} onValueChange={(value) => dispatch({ name: 'promotionType', value })}>
           <SelectTrigger>
             <SelectValue placeholder="Selecione o tipo" />
           </SelectTrigger>
@@ -155,19 +189,19 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
         </Select>
       </div>
 
-      {promotionType === '2' && (
+      {state.promotionType === '2' && (
         <div className="space-y-2">
           <Label htmlFor="discountAmount">Valor do Desconto (R$)</Label>
           <Input
             id="discountAmount"
             type="number"
             step="0.01"
-            value={discountAmount}
-            onChange={(e) => setDiscountAmount(e.target.value)}
+            value={state.discountAmount}
+            onChange={(e) => dispatch({ name: 'discountAmount', value: e.target.value })}
             required
           />
           <Label htmlFor="productId">ID do Produto</Label>
-          <Select value={productId} onValueChange={setProductId}>
+          <Select value={state.productId} onValueChange={(value) => handleProductChange(value, (value) => dispatch({ name: 'productId', value }))}>
             <SelectTrigger>
               <SelectValue placeholder="Selecione o produto" />
             </SelectTrigger>
@@ -182,21 +216,19 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
         </div>
       )}
 
-
-      {promotionType === '3' && (
-        
+      {state.promotionType === '3' && (
         <div className="space-y-2">
           <Label htmlFor="discountPercentage">Percentual de Desconto (%)</Label>
           <Input
             id="discountPercentage"
             type="number"
             step="0.01"
-            value={discountPercentage}
-            onChange={(e) => setDiscountPercentage(e.target.value)}
+            value={state.discountPercentage}
+            onChange={(e) => dispatch({ name: 'discountPercentage', value: e.target.value })}
             required
           />
           <Label htmlFor="productId">ID do Produto</Label>
-          <Select value={productId} onValueChange={() => console.log("MUDEI PORQUE SOU VIADO")}>
+          <Select value={state.productId} onValueChange={(value) => handleProductChange(value, (value) => dispatch({ name: 'productId', value }))}>
             <SelectTrigger>
               <SelectValue placeholder="Selecione o produto" />
             </SelectTrigger>
@@ -211,11 +243,11 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
         </div>
       )}
 
-      {promotionType === '4' && (
+      {state.promotionType === '4' && (
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="xProductId">ID do Produto X</Label>
-            <Select value={xProductId} onValueChange={setXProductId}>
+            <Select value={state.xProductId} onValueChange={(value) => handleProductChange(value, (value) => dispatch({ name: 'xProductId', value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o produto X" />
               </SelectTrigger>
@@ -231,14 +263,14 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
             <Input
               id="xProductAmount"
               type="number"
-              value={xProductAmount}
-              onChange={(e) => setXProductAmount(e.target.value)}
+              value={state.xProductAmount}
+              onChange={(e) => dispatch({ name: 'xProductAmount', value: e.target.value })}
               required
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="yProductId">ID do Produto Y</Label>
-            <Select value={yProductId} onValueChange={setYProductId}>
+            <Select value={state.yProductId} onValueChange={(value) => handleProductChange(value, (value) => dispatch({ name: 'yProductId', value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o produto Y" />
               </SelectTrigger>
@@ -254,8 +286,8 @@ export function PromotionForm({ initialData, onSubmit, submitLabel = 'Salvar' }:
             <Input
               id="yProductAmount"
               type="number"
-              value={yProductAmount}
-              onChange={(e) => setYProductAmount(e.target.value)}
+              value={state.yProductAmount}
+              onChange={(e) => dispatch({ name: 'yProductAmount', value: e.target.value })}
               required
             />
           </div>
